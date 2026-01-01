@@ -4,8 +4,6 @@ This repo studies a practical failure mode in EEG motor imagery (MI) decoding:
 
 **A model can perform well when train and test use the same EEG reference, but degrade sharply when the test data is referenced differently, even though the task and subject are unchanged.**
 
-The goal is a paper-quality, reproducible benchmark and a small set of strong baselines, not a new architecture.
-
 ## Why this matters
 EEG is always recorded relative to a reference, and reference choices vary across labs, hardware, and preprocessing pipelines. That creates a silent distribution shift at deployment time. This project measures how big that shift can be and which simple training strategies make MI decoders robust to it.
 
