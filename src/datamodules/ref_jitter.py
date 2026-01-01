@@ -13,6 +13,7 @@ class RefJitterSequence(Sequence):
         ref_channel="Cz",
         laplacian=False,
         keep_channels="",
+        drop_ref_channel: bool = False,
         mu=None, sd=None,
         shuffle=True,
         seed: int = 1,
@@ -33,7 +34,7 @@ class RefJitterSequence(Sequence):
         keep_names = [c.strip() for c in keep_channels.split(",") if c.strip()] or None
         self.current_names = keep_names if keep_names is not None else BCI2A_CH_NAMES
 
-        need_lap = laplacian or any(m in ("laplacian", "lap", "local") for m in self.ref_modes)
+        need_lap = laplacian or any(m in ("laplacian", "lap", "local", "bipolar", "bip", "bipolar_nn") for m in self.ref_modes)
         self.lap_neighbors = neighbors_to_index_list(all_names=BCI2A_CH_NAMES, keep_names=self.current_names) if need_lap else None
 
         # map ref_channel to index in current channel list
@@ -43,6 +44,13 @@ class RefJitterSequence(Sequence):
             if ref_channel not in name_to_i:
                 raise ValueError(f"ref_channel '{ref_channel}' not in current channel set")
             self.ref_idx = name_to_i[ref_channel]
+
+        self.drop_idx = None
+        if drop_ref_channel:
+            name_to_i = {n: i for i, n in enumerate(self.current_names)}
+            if ref_channel not in name_to_i:
+                raise ValueError(f"drop_ref_channel=True but ref_channel '{ref_channel}' not in current channel set")
+            self.drop_idx = name_to_i[ref_channel]
 
         # optional standardization applied AFTER reference transform
         self.mu = mu
@@ -70,13 +78,15 @@ class RefJitterSequence(Sequence):
         Xb = self.X[b]   # [B,C,T]
         yb = self.y[b]
 
-        out = np.empty_like(Xb, dtype=np.float32)
+        c_out = Xb.shape[1] - (1 if self.drop_idx is not None else 0)
+        out = np.empty((len(b), c_out, Xb.shape[2]), dtype=np.float32)
         for i in range(len(b)):
             m = self._pick_mode(int(b[i]))
             xi = apply_reference(
                 Xb[i:i+1], mode=m,
                 ref_idx=self.ref_idx,
                 lap_neighbors=self.lap_neighbors,
+                drop_idx=self.drop_idx,
             )[0]
             if self.mu is not None:
                 # mu,sd are [1,C,1]
